@@ -14,7 +14,6 @@ const CATEGORIES = {
 const DEFAULT_MODEL_ID = 'arcee-ai/trinity-large-preview:free';
 const CATEGORY_TIMEOUT_MS = 30000;
 const PROCESSED_ATTR = 'data-xtrareview-processed';
-const COMMENT_BODY_SELECTOR = '.comment-body, .review-comment-body, .markdown-body';
 const classificationCache = new Map();
 
 let openrouterApiKey = '';
@@ -172,7 +171,13 @@ function getTextContent(el) {
 }
 
 function getCommentBodyElement(commentEl) {
-  return commentEl.querySelector(COMMENT_BODY_SELECTOR);
+  // Prefer the outer wrapper so the toolbar sits after the full comment (headings, lists,
+  // suggested changes). Matching `.markdown-body` first can grab an inner fragment only.
+  return (
+    commentEl.querySelector('.comment-body') ||
+    commentEl.querySelector('.review-comment-body') ||
+    commentEl.querySelector('.markdown-body')
+  );
 }
 
 function extractFileInfo(commentEl) {

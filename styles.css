@@ -4,11 +4,19 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 10px;
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  margin: 10px 12px 12px;
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--bgColor-muted, var(--color-canvas-subtle, #f6f8fa));
   border: 1px solid var(--borderColor-default, var(--color-border-default, #d8dee4));
+  /* Keep the full-width layout, but leave consistent outer spacing so the toolbar
+     does not sit flush against the left, right, or bottom edges of the thread. */
+  flex: 0 0 auto;
+  min-height: 0;
+  height: fit-content;
+  max-height: none;
 }
 
 .xtrareview-toolbar-header {
