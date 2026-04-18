@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "xtrareview",
+  "version": "2.0.0",
+  "description": "Learn from code review comments on GitHub PRs",
+  "permissions": ["clipboardWrite", "activeTab", "storage"],
+  "host_permissions": ["https://openrouter.ai/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*/pull/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
