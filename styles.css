@@ -31,11 +31,12 @@
 
 .xtrareview-toolbar-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
 }
 
-/* ── Inline Learn button ── */
+/* ── Inline action buttons ── */
 
 .xtrareview-inline-btn {
   display: inline-flex;
@@ -62,9 +63,21 @@
   box-shadow: 0 1px 3px rgba(110, 119, 129, 0.25);
 }
 
+.xtrareview-inline-btn--copy:hover {
+  background-color: #1f6feb;
+  border-color: #1f6feb;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(31, 111, 235, 0.3);
+}
+
 .xtrareview-inline-btn:active {
   background-color: #57606a;
   box-shadow: none;
+}
+
+.xtrareview-inline-btn--copy:active {
+  background-color: #1558c0;
+  border-color: #1558c0;
 }
 
 /* ── Category badge ── */
@@ -89,6 +102,57 @@
   white-space: nowrap;
   letter-spacing: 0.2px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Recurrence chip (radar) ── */
+
+.xtrareview-recurrence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 10px;
+  border-radius: 2em;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d8dee4));
+  background: transparent;
+  color: var(--fgColor-default, var(--color-fg-default, #1f2328));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: help;
+}
+
+.xtrareview-recurrence-chip__count {
+  font-weight: 700;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.xtrareview-recurrence-chip--recurring {
+  border-color: var(--borderColor-accent-emphasis, var(--color-accent-emphasis, #0969da));
+  background: var(--bgColor-accent-muted, rgba(9, 105, 218, 0.08));
+}
+
+.xtrareview-recurrence-chip--recurring .xtrareview-recurrence-chip__count {
+  color: var(--fgColor-accent, var(--color-accent-fg, #0969da));
+}
+
+.xtrareview-recurrence-chip__sep {
+  flex: 0 0 auto;
+  opacity: 0.5;
+}
+
+.xtrareview-recurrence-chip__lesson {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 /* ── "No API key" hint ── */
@@ -132,7 +196,7 @@
 
 #xtrareview-toast {
   position: fixed;
-  bottom: 80px;
+  bottom: 16px;
   right: 24px;
   z-index: 100000;
   padding: 12px 20px;

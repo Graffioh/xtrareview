@@ -6,13 +6,21 @@
 // we can evict the oldest entries when the cache grows too large.
 
 (function (global) {
-  const CACHE_KEY_PREFIX = 'xrcache:v1:';
-  const CACHE_INDEX_KEY = 'xrcache:v1:__index__';
+  // Bumped from v1 → v2 when the lesson-distillation prompt was rewritten to
+  // produce high-level, language-agnostic principles. Old v1 entries cached
+  // narrow, syntax-specific lessons (e.g. "Avoid optional ? when ...") that
+  // would otherwise stick around for 30 days and drown out the new style.
+  const CACHE_KEY_PREFIX = 'xrcache:v2:';
+  const CACHE_INDEX_KEY = 'xrcache:v2:__index__';
+  const LEGACY_CLEANUP_FLAG_KEY = 'xrcache:v2:__legacy_cleanup__';
+  const LEGACY_PREFIXES = ['xrcache:v1:'];
   const MAX_ENTRIES = 1000;
   const TTL_MS = 30 * 24 * 60 * 60 * 1000;
   // Match the slice the classifier prompt uses so identical prompts
   // always resolve to the same cache key.
   const COMMENT_KEY_LIMIT = 1000;
+
+  let legacyCleanupChecked = false;
 
   async function sha256Hex(text) {
     const encoder = new TextEncoder();
@@ -80,8 +88,32 @@
     });
   }
 
-  async function getCachedCategory(modelId, commentText) {
+  // Removes orphaned cache keys from the previous prompt version. Runs at most
+  // once per browser via a persisted flag, and additionally short-circuits
+  // within a single service-worker lifetime.
+  async function cleanupLegacyCacheKeys() {
+    if (legacyCleanupChecked || !hasStorage()) return;
+    legacyCleanupChecked = true;
+
+    try {
+      const stored = await storageGet(LEGACY_CLEANUP_FLAG_KEY);
+      if (stored?.[LEGACY_CLEANUP_FLAG_KEY]) return;
+
+      const all = await storageGet(null);
+      const legacyKeys = Object.keys(all).filter((key) =>
+        LEGACY_PREFIXES.some((prefix) => key.startsWith(prefix))
+      );
+      if (legacyKeys.length) await storageRemove(legacyKeys);
+
+      await storageSet({ [LEGACY_CLEANUP_FLAG_KEY]: true });
+    } catch {
+      /* best effort */
+    }
+  }
+
+  async function getCachedClassification(modelId, commentText) {
     if (!hasStorage() || !modelId || typeof commentText !== 'string') return null;
+    cleanupLegacyCacheKeys();
 
     let key;
     try {
@@ -109,11 +141,19 @@
       return null;
     }
 
-    return entry.category;
+    // Legacy entries created before lessons existed: treat as a miss so the
+    // next classification re-runs and backfills the new schema. The classifier
+    // will overwrite this key with a complete entry.
+    if (typeof entry.lesson !== 'string') {
+      return null;
+    }
+
+    return { category: entry.category, lesson: entry.lesson };
   }
 
-  async function setCachedCategory(modelId, commentText, category) {
+  async function setCachedClassification(modelId, commentText, category, lesson) {
     if (!hasStorage() || !modelId || typeof commentText !== 'string' || !category) return;
+    cleanupLegacyCacheKeys();
 
     let key;
     try {
@@ -122,7 +162,11 @@
       return;
     }
 
-    const entry = { category, ts: Date.now() };
+    const entry = {
+      category,
+      lesson: typeof lesson === 'string' ? lesson : '',
+      ts: Date.now(),
+    };
 
     try {
       const indexResult = await storageGet(CACHE_INDEX_KEY);
@@ -164,8 +208,8 @@
   }
 
   global.XtraReviewCache = {
-    getCachedCategory,
-    setCachedCategory,
+    getCachedClassification,
+    setCachedClassification,
     clearCache,
   };
 })(typeof self !== 'undefined' ? self : globalThis);

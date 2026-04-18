@@ -8,7 +8,7 @@ const CATEGORIES = {
   best_practice: { label: 'Best Practice', color: '#57ab5a' },
   bug: { label: 'Bug', color: '#f47067' },
   readability: { label: 'Readability', color: '#768390' },
-  other: { label: 'Other', color: '#57606a' },
+  other: { label: 'Other', color: '#49515a' },
 };
 
 const DEFAULT_MODEL_ID = 'arcee-ai/trinity-large-preview:free';
@@ -249,6 +249,100 @@ function getAuthor(commentEl) {
   return authorLink ? authorLink.textContent.trim() : 'Unknown';
 }
 
+// ── PR author detection (for radar) ──
+
+function getCurrentGithubUser() {
+  const meta = document.querySelector('meta[name="user-login"]');
+  const login = meta?.getAttribute('content');
+  return typeof login === 'string' ? login.trim() : '';
+}
+
+function getPrAuthorLogin() {
+  // The PR description is always the first comment in the discussion timeline,
+  // and it is authored by the PR author. GitHub marks that author link with
+  // itemprop="author" — that has been stable across the legacy and current
+  // PR layouts, while the older `.gh-header-meta a.author` selector no longer
+  // matches reliably on every PR (especially merged ones, where the header
+  // link is the merger, not the author).
+  const candidates = [
+    '.js-discussion [itemprop="author"]',
+    '.js-discussion .timeline-comment-header a.author',
+    '[itemprop="author"]',
+    '.gh-header-meta a.author',
+    '.gh-header-meta .author',
+    '[data-testid="header-author"] a',
+  ];
+
+  for (const selector of candidates) {
+    const el = document.querySelector(selector);
+    const text = el?.textContent?.trim();
+    if (text) return text;
+  }
+
+  // Last-resort fallback: the very first author link anywhere in the
+  // discussion stream is the PR description's author.
+  const fallback = document.querySelector('.js-discussion a.author');
+  return fallback?.textContent?.trim() || '';
+}
+
+function getPrCoordinates() {
+  const match = location.href.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  if (!match) return null;
+  return {
+    repo: `${match[1]}/${match[2]}`,
+    prNumber: Number(match[3]),
+  };
+}
+
+function getPrTitle() {
+  const titleEl =
+    document.querySelector('.js-issue-title') ||
+    document.querySelector('bdi.js-issue-title') ||
+    document.querySelector('h1 .js-issue-title');
+  return titleEl?.textContent?.trim() || '';
+}
+
+let isAuthorPrCache = { url: '', value: false };
+
+function isAuthorOfCurrentPr() {
+  if (isAuthorPrCache.url === location.href) {
+    return isAuthorPrCache.value;
+  }
+
+  const me = getCurrentGithubUser();
+  const prAuthor = getPrAuthorLogin();
+
+  // Only cache once both signals are available; otherwise re-check next call so
+  // we do not lock in `false` while GitHub is still hydrating the PR header.
+  if (!me || !prAuthor) {
+    return false;
+  }
+
+  const value = me.toLowerCase() === prAuthor.toLowerCase();
+  isAuthorPrCache = { url: location.href, value };
+  return value;
+}
+
+function extractCommentAnchorId(commentEl) {
+  if (commentEl.id && /^(discussion_r|issuecomment-|pullrequestreview-)/.test(commentEl.id)) {
+    return commentEl.id;
+  }
+
+  const anchored = commentEl.closest('[id^="discussion_r"], [id^="issuecomment-"]');
+  if (anchored?.id) return anchored.id;
+
+  const permalink = commentEl.querySelector(
+    'a[href*="#discussion_r"], a[href*="#issuecomment-"]'
+  );
+  if (permalink) {
+    const href = permalink.getAttribute('href') || '';
+    const idx = href.lastIndexOf('#');
+    if (idx >= 0) return href.slice(idx + 1);
+  }
+
+  return commentEl.id || '';
+}
+
 function isReviewComment(commentEl) {
   if (
     commentEl.closest(
@@ -271,65 +365,6 @@ function isReviewComment(commentEl) {
   return !!commentEl.closest('.file, [id^="pullrequestreview-"]');
 }
 
-// ── Prompt formatting ──
-
-function formatSingleCommentPrompt(comment) {
-  const location = comment.filePath
-    ? `\`${comment.filePath}${comment.lineNum ? ':' + comment.lineNum : ''}\``
-    : '(general comment)';
-
-  const categoryLabel = comment.category
-    ? CATEGORIES[comment.category]?.label ?? 'Unknown'
-    : 'Unknown';
-
-  const fileExt = comment.filePath ? comment.filePath.split('.').pop() : '';
-  const langHint = fileExt ? ` The code is in a \`.${fileExt}\` file.` : '';
-
-  let prompt = `**ROLE:** You are a senior software engineer and patient technical mentor. Your goal is to help a developer deeply understand the lesson behind a code review comment — not just fix it, but internalize the principle so they never make the same mistake again.
-
-**CONTEXT:** During a pull request review on GitHub, a reviewer left a comment on my code. The comment falls under the "${categoryLabel}" category.${langHint} I want to learn from this feedback and grow as a developer.
-
----
-
-**Reviewer:** ${comment.author}
-**File:** ${location}
-**Category:** ${categoryLabel}
-`;
-
-  if (comment.codeSnippet) {
-    prompt += `
-**Code under review:**
-\`\`\`
-${comment.codeSnippet}
-\`\`\`
-`;
-  }
-
-  prompt += `
-**Reviewer's comment:**
-${comment.body}
-
----
-
-**INSTRUCTIONS:** Analyze this review comment and teach me the lesson behind it. Be specific and use the actual code shown above in your examples. Structure your response as follows:
-
-1. **What the reviewer is pointing out** — Summarize the issue in plain language. What exactly is wrong or could be improved, and why did the reviewer flag it?
-
-2. **Why this matters in practice** — Explain the real-world consequences. What bugs, performance problems, security risks, or maintenance headaches can this cause? Give a concrete scenario where this would bite a team in production.
-
-3. **The underlying principle** — What software engineering principle, best practice, or design pattern does this relate to? (e.g., Principle of Least Privilege, DRY, defensive programming, immutability, separation of concerns, etc.)
-
-4. **Before & After** — Show a short code example demonstrating the problematic pattern vs. the corrected approach. Use the same language and context from the reviewed code. Annotate with brief comments explaining each change.
-
-5. **How to spot this in future code reviews** — Give me 2–3 concrete signals or patterns I can watch for in my own code so I catch this proactively before a reviewer does.
-
-6. **Related concepts to explore** — List 2–3 related topics, patterns, or tools I should read about to deepen my understanding of this area.
-
-Keep the tone conversational but technically precise. Prioritize practical understanding over theory.`;
-
-  return prompt;
-}
-
 // ── UI Injection ──
 
 function createCategoryBadge(category) {
@@ -341,6 +376,50 @@ function createCategoryBadge(category) {
     badge.style.backgroundColor = cat.color;
   }
   return badge;
+}
+
+function formatRelativeTime(ts) {
+  if (!ts) return 'unknown';
+  const diffMs = Date.now() - ts;
+  if (diffMs < 0) return 'just now';
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
+
+function createRecurrenceChip({ count, lesson, lastSeenTs }) {
+  const safeCount = Math.max(1, count || 1);
+  const chip = document.createElement('span');
+  chip.className = 'xtrareview-recurrence-chip';
+  if (safeCount >= 2) chip.classList.add('xtrareview-recurrence-chip--recurring');
+  const seenLabel = safeCount === 1 ? 'Seen 1 time' : `Seen ${safeCount} times`;
+  chip.title = `${lesson}\n\n${seenLabel}\nLast seen: ${formatRelativeTime(lastSeenTs)}`;
+
+  const countEl = document.createElement('span');
+  countEl.className = 'xtrareview-recurrence-chip__count';
+  countEl.textContent = `${safeCount}×`;
+  chip.appendChild(countEl);
+
+  const sep = document.createElement('span');
+  sep.className = 'xtrareview-recurrence-chip__sep';
+  sep.textContent = '·';
+  chip.appendChild(sep);
+
+  const lessonEl = document.createElement('span');
+  lessonEl.className = 'xtrareview-recurrence-chip__lesson';
+  lessonEl.textContent = lesson;
+  chip.appendChild(lessonEl);
+
+  return chip;
 }
 
 function createSpinner() {
@@ -367,9 +446,11 @@ function createMutedHint(text, title = '') {
   return hint;
 }
 
-function createActionButton(label, onClick) {
+function createActionButton(label, onClick, variant = '') {
   const btn = document.createElement('button');
-  btn.className = 'xtrareview-inline-btn';
+  btn.className = variant
+    ? `xtrareview-inline-btn xtrareview-inline-btn--${variant}`
+    : 'xtrareview-inline-btn';
   btn.textContent = label;
   btn.addEventListener('click', onClick);
   return btn;
@@ -492,16 +573,8 @@ async function processComment(el) {
     const copyBtn = createActionButton('Copy', async () => {
       const ok = await copyToClipboard(body);
       showToast(ok ? 'Copied to clipboard' : 'Could not copy — check clipboard permissions');
-    });
+    }, 'copy');
     actions.appendChild(copyBtn);
-
-    const learnBtn = createActionButton('Learn', async () => {
-      const comment = { author, filePath, lineNum, body, codeSnippet, category: el._xtrareviewCategory };
-      const prompt = formatSingleCommentPrompt(comment);
-      const ok = await copyToClipboard(prompt);
-      showToast(ok ? 'Copied structured prompt to clipboard' : 'Could not copy — check clipboard permissions');
-    });
-    actions.appendChild(learnBtn);
 
     actions.appendChild(createCategoryBadge(result.category));
 
@@ -512,6 +585,15 @@ async function processComment(el) {
     } else {
       el.appendChild(toolbar);
     }
+
+    await maybeRecordAndAnnotateRadar({
+      el,
+      actions,
+      author,
+      filePath,
+      result,
+    });
+
     return;
   }
 
@@ -529,6 +611,49 @@ async function processComment(el) {
     } else {
       el.appendChild(hintToolbar);
     }
+  }
+}
+
+async function maybeRecordAndAnnotateRadar({ el, actions, author, filePath, result }) {
+  if (typeof XtraReviewRadar === 'undefined') return;
+  if (!result?.ok || !result.lesson || result.category === 'not_a_review') return;
+  if (!isAuthorOfCurrentPr()) return;
+
+  const coords = getPrCoordinates();
+  if (!coords) return;
+
+  const commentId = extractCommentAnchorId(el);
+  if (!commentId) return;
+
+  try {
+    const entry = await XtraReviewRadar.recordComment({
+      repo: coords.repo,
+      prNumber: coords.prNumber,
+      prTitle: getPrTitle(),
+      commentId,
+      reviewer: author,
+      category: result.category,
+      lesson: result.lesson,
+      filePath,
+    });
+
+    if (!entry || !actions.isConnected) return;
+
+    const recurrence = await XtraReviewRadar.getRecurrenceForLesson(entry.lessonKey);
+    if (!actions.isConnected) return;
+
+    // The radar always records before this read, so a count of at least 1 is
+    // expected. Show the chip every time so the toolbar consistently surfaces
+    // the lesson, with a stronger visual treatment once the lesson recurs.
+    actions.appendChild(
+      createRecurrenceChip({
+        count: recurrence?.count || 1,
+        lesson: entry.lesson,
+        lastSeenTs: recurrence?.lastSeenTs || entry.ts,
+      })
+    );
+  } catch {
+    /* radar is best-effort; never break the toolbar */
   }
 }
 

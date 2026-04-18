@@ -171,6 +171,221 @@
       opacity: 0.6;
       cursor: wait;
     }
+
+    /* ── Clear cache button ── */
+    #clear-cache {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2328;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    #clear-cache:hover:not(:disabled) {
+      background: #f3f4f6;
+      border-color: #afb8c1;
+    }
+
+    #clear-cache:active:not(:disabled) {
+      background: #eaeef2;
+    }
+
+    #clear-cache:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── Radar dashboard ── */
+    .radar-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
+
+    .radar-summary-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1f2328;
+    }
+
+    .radar-summary-hint {
+      font-size: 10.5px;
+      color: #8b949e;
+    }
+
+    .radar-empty {
+      font-size: 11.5px;
+      color: #656d76;
+      line-height: 1.5;
+      padding: 8px 0;
+    }
+
+    .radar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radar-item {
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fbfcfd;
+    }
+
+    .radar-item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radar-item-count {
+      flex: 0 0 auto;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #ffffff;
+      background: #57606a;
+      padding: 2px 7px;
+      border-radius: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    .radar-item-lesson {
+      flex: 1 1 auto;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1f2328;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .radar-item-meta {
+      font-size: 10.5px;
+      color: #8b949e;
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .radar-item-meta a {
+      color: #0969da;
+      text-decoration: none;
+    }
+
+    .radar-item-meta a:hover {
+      text-decoration: underline;
+    }
+
+    .radar-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 4px 0;
+    }
+
+    .radar-pagination[hidden] {
+      display: none;
+    }
+
+    .radar-page-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 24px;
+      padding: 0 8px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2328;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .radar-page-btn:hover:not(:disabled) {
+      background: #f3f4f6;
+      border-color: #afb8c1;
+    }
+
+    .radar-page-btn:active:not(:disabled) {
+      background: #eaeef2;
+    }
+
+    .radar-page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .radar-page-indicator {
+      font-size: 11px;
+      font-weight: 500;
+      color: #656d76;
+      min-width: 80px;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    .radar-cat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+    }
+
+    .radar-cat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .radar-cat-pill .cat-pill-count {
+      opacity: 0.85;
+      font-weight: 500;
+    }
+
+    .radar-clear {
+      width: 100%;
+      margin-top: 12px;
+      padding: 7px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #cf222e;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .radar-clear:hover:not(:disabled) {
+      background: #ffebe9;
+      border-color: #f1aeb5;
+    }
+
+    .radar-clear:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -197,6 +412,11 @@
       <div id="test-status" class="hint"></div>
       <div class="hint">If you reloaded the extension, refresh the GitHub PR tab too.</div>
     </div>
+    <div class="input-group">
+      <button id="clear-cache" type="button">Clear classification cache</button>
+      <div id="clear-cache-status" class="hint"></div>
+      <div class="hint">Forces every comment to be re-classified on the next PR visit. Useful after changing the model or lesson prompt. Refresh the GitHub tab afterwards.</div>
+    </div>
   </div>
 
   <div class="section">
@@ -204,6 +424,27 @@
     <div class="category-preview" id="category-preview"></div>
   </div>
 
+  <div class="section">
+    <div class="section-label">Recurring Feedback Radar</div>
+    <div class="radar-summary">
+      <span class="radar-summary-count" id="radar-count">0 comments tracked</span>
+      <span class="radar-summary-hint">From PRs you authored</span>
+    </div>
+    <div id="radar-empty" class="radar-empty" hidden>
+      Open a pull request you authored to start collecting recurring feedback.
+    </div>
+    <div id="radar-list" class="radar-list"></div>
+    <div id="radar-pagination" class="radar-pagination" hidden>
+      <button id="radar-prev" class="radar-page-btn" type="button" aria-label="Previous page">←</button>
+      <span id="radar-page-indicator" class="radar-page-indicator">Page 1 of 1</span>
+      <button id="radar-next" class="radar-page-btn" type="button" aria-label="Next page">→</button>
+    </div>
+    <div id="radar-categories" class="radar-cat-row"></div>
+    <button id="radar-clear" class="radar-clear" type="button">Clear history</button>
+  </div>
+
+  <script src="cache.js"></script>
+  <script src="radar.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
